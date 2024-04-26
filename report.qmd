@@ -1,0 +1,99 @@
+---
+title: "Single Measurement Percentile"
+format: html
+editor: visual
+server: shiny
+---
+
+```{r}
+#| context: setup
+library(shiny)
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(png)
+library(markdown)
+library(stringr)
+library(ggpubr)
+library(ggrepel)
+library(DT)
+```
+
+```{r}
+plotOutput('plot')
+```
+
+```{r}
+#| context: server
+  # Creates qs() reactive function with data for percentiles
+  qs <- eventReactive(input$update, {
+    # Load percentiles dataset
+    fname <- file.path(
+      "Trait_Percentiles",
+      paste0(if_else(input$sex == "Female", "Female_", "Male_"),
+             trait_to_abbrev(input$measurement),
+             "_percentiles.Rds"))
+    readRDS(fname) |> 
+      select(-years, -months) # Drop these columns so t() later
+    # doesn't cause a problem
+  })
+  
+  # Creates reactive age() with age as decimal
+  age <- eventReactive(input$update, {
+    yrmo_to_years(input$age_yrs, input$age_months)
+    })
+  
+  int_measure <- eventReactive(input$update, {
+    as.numeric(input$measure)
+    })
+  
+  pick_measurement <- eventReactive(input$update, {
+    input$measurement
+    })
+  
+  select_sex <- eventReactive(input$update, {
+    input$sex
+  })
+  
+  # Percentile plot ##########################################################
+  
+    # Create percentiles plot using qs() and age()
+    output$plot <- renderPlot({
+      
+      q <- qs() |> 
+        slice(seq(1, nrow(qs()), by = 10)) |> 
+        dplyr::select(age, all_of(percentiles_to_plot))
+      
+      trait_string <- paste0(select_sex(), ": ", pick_measurement())
+      
+      obs <- tibble(age = age(),
+                    measure = int_measure())
+      
+      # Find percentile
+      measure <- int_measure()
+      age_rnd <- round(age(), 2)
+      q_obs <- qs() |> 
+        filter(age == age_rnd) |> 
+        select(-age) |> 
+        t()
+      percentile <- which.min(abs(q_obs - measure))
+      
+      # Plot
+      p <- plot_percentile(q = q, trait_string = trait_string) +
+        geom_point(data = obs, aes(x = age, y = measure),
+                   color = red_color,
+                   size = 3) +
+        labs(subtitle = paste0("Percentile: ", percentile))
+      
+      if (percentile == 1 | percentile == 99) {
+        p <- p +
+          annotate("text", -Inf, Inf,
+                   label = "Note: Extreme value for measurement",
+                   hjust = 0, vjust = 1,
+                   color = red_color,
+                   size = 8)
+      }
+      p
+    }, res = 125)
+```

@@ -1,0 +1,135 @@
+---
+title: "Multiple Timepoints"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+editor: visual
+params:
+  sex: "Male"
+  age1: 9
+  age2: 12
+  age3: 16
+  measuretime1: 33.4
+  measuretime2: 35.8
+  measuretime3: 36
+  trait: "Sella-Basion"
+date: "2024-04-19"
+mainfont: Arial
+---
+
+```{r setup, include=FALSE}
+
+#Setting everything up
+
+library(tidyverse)
+library(dplyr)
+library(DT)
+
+knitr::opts_chunk$set(echo = FALSE)
+
+source("includes.R")
+
+sex <- params$sex
+age1 <- params$age1
+age2 <- params$age2
+age3 <- params$age3
+measuretime1 <- params$measuretime1
+measuretime2 <- params$measuretime2
+measuretime3 <- params$measuretime3
+trait <- params$trait
+
+```
+
+```{r}
+
+#Retrieve selected trait data
+  fname <- file.path(
+    "Trait_Percentiles",
+    paste0(if_else(sex == "Female", "Female_", "Male_"),
+           trait_to_abbrev(trait),
+           "_percentiles.Rds"))
+  q <- readRDS(fname) |> 
+    select(-years, -months)
+
+```
+
+```{r}
+ 
+ # Find percentiles
+  age_1_rnd_time <- round(age1, 2)
+  q_obs_1_time <- q |>
+    filter(age == age_1_rnd_time) |>
+    select(-age) |>
+    t()
+  pct_1_time <- which.min(abs(q_obs_1_time - measuretime1))
+  
+  age_2_rnd_time <- round(age2, 2)
+  q_obs_2_time <- q |>
+    filter(age == age_2_rnd_time) |>
+    select(-age) |>
+    t()
+  pct_2_time <- which.min(abs(q_obs_2_time - measuretime2))
+  
+  age_3_rnd_time <- round(age3, 2)
+  q_obs_3_time <- q |>
+    filter(age == age_3_rnd_time) |>
+    select(-age) |>
+    t()
+  pct_3_time <- which.min(abs(q_obs_3_time - measuretime3))
+  
+```
+
+```{r}
+
+#create tibble with the age times  
+out_time <- tibble(
+  Sex = rep(sex, times = 3),
+  Measurement = rep(trait, times = 3),
+  `Age (yr)` =c(age1,
+                age2,
+                age3) |>
+                round(2),
+  `Measurement (mm)` = c(measuretime1,
+                         measuretime2,
+                         measuretime3),
+  Percentile = c(pct_1_time, pct_2_time, pct_3_time))
+ 
+#create the data table 
+datatable(out_time,
+          filter = "none",
+          rownames = FALSE,
+          class = 'cell-border stripe',
+          options = list(paging = FALSE,
+                         searching = FALSE,
+                         info = FALSE)) |>
+  formatStyle('Percentile',  color = 'firebrick4',
+              fontWeight = 'bold')
+
+```
+
+```{r}
+
+#Generate plot for the multiple timepoints
+q_multi_time_to_plot <- q |> 
+      slice(seq(1, nrow(q), by = 10)) |> 
+      dplyr::select(age, all_of(percentiles_to_plot))
+
+pcts_time <- tibble(
+  Age = c(age1,
+          age2,
+          age3),
+  Percentile = c(measuretime1, measuretime2, measuretime3)
+)
+
+plot_percentile(q = q_multi_time_to_plot,
+                trait_string = trait) +
+  geom_line(data = pcts_time,
+            aes(x = Age, y = Percentile),
+            color = red_color, linewidth = 1) +
+  geom_point(data = pcts_time,
+             aes(x = Age, y = Percentile),
+             color = red_color, size = 2.5)
+      
+  
+
+```

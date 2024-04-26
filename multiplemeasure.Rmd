@@ -1,0 +1,127 @@
+---
+title: "Multiple Measurement Analysis"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+editor: visual
+params:
+  sex: "Female"
+  measurement1: "ANS-PNS"
+  measure1: 45
+  measurement2: "Articulare-Pogonion"
+  measure2: 90
+  measurement3: "Nasion-Basion"
+  measure3: 100
+  age: 10
+date: "2024-04-19"
+mainfont: Arial
+---
+
+```{r, setup, echo=FALSE, message=FALSE}
+
+#Setting everything up
+
+library(tidyverse)
+library(DT)
+
+knitr::opts_chunk$set(echo = FALSE)
+
+source("includes.R")
+
+sex <- params$sex
+measurement1 <- params$measurement1
+measurement2 <- params$measurement2
+measurement3 <- params$measurement3
+measure1 <- params$measure1
+measure2 <- params$measure2
+measure3 <- params$measure3
+age <- params$age
+
+```
+
+
+```{r}
+#Reading Out Files for Three Measurements
+
+fname1 <- file.path(
+  "Trait_Percentiles",
+  paste0(if_else(sex == "Female", "Female_", "Male_"),
+         trait_to_abbrev(measurement1),
+         "_percentiles.Rds"))
+q1 <- readRDS(fname1) |> 
+  select(-years, -months) # Drop these columns so t() later
+
+fname2 <- file.path(
+  "Trait_Percentiles",
+  paste0(if_else(sex == "Female", "Female_", "Male_"),
+         trait_to_abbrev(measurement2),
+         "_percentiles.Rds"))
+q2 <- readRDS(fname1) |> 
+  select(-years, -months)
+
+fname3 <- file.path(
+  "Trait_Percentiles",
+  paste0(if_else(sex == "Female", "Female_", "Male_"),
+         trait_to_abbrev(measurement3),
+         "_percentiles.Rds"))
+q3 <- readRDS(fname1) |> 
+  select(-years, -months) # Drop these columns so t() later
+
+# Age rounded to 2 decimals
+age_rnd <- round(age, 2)
+
+```
+
+```{r}
+
+#Filter the closest percentile
+q_obs_1 <- q1 |>
+    filter(age == age_rnd) |>
+    select(-age) |>
+    t()
+  pct_1 <- which.min(abs(q_obs_1 - measure1))
+    
+q_obs_2 <- q2 |>
+    filter(age == age_rnd) |>
+    select(-age) |>
+    t()
+  pct_2 <- which.min(abs(q_obs_2 - measure2))
+    
+q_obs_3 <- q3 |>
+    filter(age == age_rnd) |>
+    select(-age) |>
+    t()
+  pct_3 <- which.min(abs(q_obs_3 - measure3))
+    
+```
+
+```{r}
+
+#Create the tibble for the table
+  out <- tibble(
+    Sex = rep(sex, times = 3),
+    `Age (yr)` = rep(age, times = 3) |>
+      round(2),
+    Measurement = c(measurement1,
+              measurement2,
+              measurement3),
+    `Measurement (mm)` = c(measure1,
+                           measure2,
+                           measure3),
+    Percentile = c(pct_1, pct_2, pct_3))
+```
+
+```{r}
+
+#Output the table
+  datatable(out,
+            filter = "none",
+            rownames = FALSE,
+            class = 'cell-border stripe',
+            options = list(paging = FALSE,
+                           searching = FALSE,
+                           info = FALSE)) |>
+    formatStyle('Percentile',  color = 'firebrick4',
+                fontWeight = 'bold')
+
+```

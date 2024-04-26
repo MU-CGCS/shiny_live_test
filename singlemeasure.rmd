@@ -1,0 +1,155 @@
+---
+title: "Single Measure Report"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+editor: visual
+params:
+  sex: "Female"
+  measurement: "Nasion-Basion"
+  measure: 100
+  age: 10
+  trait_string: "Female: Nasion-Basion"
+mainfont: Arial
+---
+
+```{r, setup, echo=FALSE, message=FALSE}
+library(tidyverse)
+
+knitr::opts_chunk$set(echo = FALSE)
+
+source("includes.R")
+
+sex <- params$sex
+measurement <- params$measurement
+measure <- as.numeric(params$measure)
+age <- params$age
+trait_string <- params$trait_string
+```
+
+```{r}
+# Get percentiles from Rds
+fname <- file.path(
+  "Trait_Percentiles",
+  paste0(if_else(sex == "Female", "Female_", "Male_"),
+         trait_to_abbrev(measurement),
+         "_percentiles.Rds"))
+q <- readRDS(fname) |> 
+  select(-years, -months) # Drop these columns so t() later
+
+obs <- tibble(age = age,
+              measure = measure)
+
+# Age rounded to 2 decimals
+age_rnd <- round(age, 2)
+
+```
+
+```{r}
+# Full set of percentiles for age_rnd
+q_obs <- q |> 
+  filter(age == age_rnd) |> 
+  select(-age) |> 
+  t()
+```
+
+```{r}
+
+# Find the percentile in q_obs that is closest to measure
+percentile <- which.min(abs(q_obs - measure))
+```
+
+```{r}
+
+# Use only every 10th value so that the percentile lines are smooth
+q_plot <- q |> 
+  slice(seq(1, nrow(q), by = 10)) |> 
+  dplyr::select(age, all_of(percentiles_to_plot))
+
+
+plot_percentile(q = q_plot, trait_string = trait_string) +
+        geom_point(data = obs, aes(x = age, y = measure),
+                   color = red_color,
+                   size = 3) +
+        labs(subtitle = paste0("Percentile: ", percentile))
+```
+
+Sex is `r sex`.
+
+Measure is `r measure`.
+
+```{r, eval=FALSE}
+#| 
+# library(dplyr)
+# library(ggplot2)
+# library(tidyr)
+# source("includes.R")
+# 
+#   # Creates qs() reactive function with data for percentiles
+#   qs <- function() {
+#     # Load percentiles dataset
+#     fname <- file.path(
+#       "Trait_Percentiles",
+#       paste0(if_else(params$sex == "Female", "Female_", "Male_"),
+#              trait_to_abbrev(params$measurement),
+#              "_percentiles.Rds"))
+#     data <- readRDS(fname)
+#     data <- select(data, -years, -months)
+#   }
+#   
+#   # Creates reactive age() with age as decimal
+#   age <- function() {params$age}
+# 
+#   int_measure <- function() {
+#     as.numeric(params$measure)
+#   }
+#     
+#   pick_measurement <- function() {
+#     params$measurement
+#   }
+#     
+#   select_sex <- function() {
+#     params$sex
+#   }
+#     
+#   
+#   # Percentile plot ##########################################################
+#   
+#     # Create percentiles plot using qs() and age()
+#       
+#       q <- qs() |> 
+#         slice(seq(1, nrow(qs()), by = 10)) |> 
+#         dplyr::select(age, all_of(percentiles_to_plot))
+#       
+#       trait_string <- paste0(select_sex(), ": ", pick_measurement())
+#       
+#       obs <- tibble(age = age(),
+#                     measure = int_measure())
+#       
+#       # Find percentile
+#       measure <- int_measure()
+#       age_rnd <- round(age(), 2)
+#       q_obs <- qs() |> 
+#         filter(age == age_rnd) |> 
+#         select(-age) |> 
+#         t()
+#       percentile <- which.min(abs(q_obs - measure))
+#       
+#       # Plot
+#       p <- plot_percentile(q = q, trait_string = trait_string) +
+#         geom_point(data = obs, aes(x = age, y = measure),
+#                    color = red_color,
+#                    size = 3) +
+#         labs(subtitle = paste0("Percentile: ", percentile))
+#       
+#       if (percentile == 1 | percentile == 99) {
+#         p <- p +
+#           annotate("text", -Inf, Inf,
+#                    label = "Note: Extreme value for measurement",
+#                    hjust = 0, vjust = 1,
+#                    color = red_color,
+#                    size = 8)
+#       }
+#       p
+      
+```
